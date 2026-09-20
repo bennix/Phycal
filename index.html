@@ -22,10 +22,25 @@
     .btn-main { padding: 15px 40px; border-radius: 9999px; background: linear-gradient(135deg, #6366f1, #0ea5e9); color: #fff; font-size: 16px; font-weight: 600; border: none; cursor: pointer; box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4); transition: transform 0.2s; }
     .btn-main:hover { transform: scale(1.03); }
     #testModal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(25px); z-index: 100; display: none; justify-content: center; align-items: center; padding: 20px; }
-    .modal-card { background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 24px; padding: 32px; max-width: 600px; width: 100%; text-align: center; position: relative; }
+    .modal-card { background: rgba(8, 15, 30, 0.92); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 24px; padding: 32px; max-width: 680px; width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; text-align: center; position: relative; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
     .close-btn { position: absolute; top: 16px; right: 20px; background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; }
     .quiz-opt { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 18px; cursor: pointer; margin-top: 10px; text-align: left; transition: all 0.2s; }
     .quiz-opt:hover { background: rgba(99,102,241,0.25); border-color: #38bdf8; transform: translateX(4px); }
+    .quiz-progress { display:flex; gap:6px; margin:0 auto 24px; max-width:240px; }
+    .quiz-progress span { height:3px; flex:1; border-radius:99px; background:rgba(255,255,255,.12); transition:background .25s; }
+    .quiz-progress span.active { background:#38bdf8; }
+    .result-kicker { color:#7dd3fc; font-size:11px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; margin-bottom:10px; }
+    .result-type { font-size:clamp(28px, 6vw, 42px); line-height:1.1; margin-bottom:12px; background:linear-gradient(120deg,#fff,#7dd3fc 70%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .result-summary { max-width:520px; margin:0 auto 26px; color:#a8b6ca; font-size:14px; line-height:1.75; }
+    .spectrum-list { display:grid; gap:13px; text-align:left; margin:0 0 24px; }
+    .spectrum-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
+    .spectrum-name { font-size:13px; font-weight:700; color:#e2e8f0; }
+    .spectrum-note { font-size:11px; color:#64748b; margin-left:6px; font-weight:400; }
+    .spectrum-score { font-size:12px; color:#7dd3fc; font-variant-numeric:tabular-nums; }
+    .spectrum-track { height:7px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; }
+    .spectrum-fill { height:100%; width:0; border-radius:inherit; background:linear-gradient(90deg,#6366f1,#38bdf8); box-shadow:0 0 14px rgba(56,189,248,.35); transition:width .8s cubic-bezier(.2,.8,.2,1); }
+    .result-note { border-top:1px solid rgba(255,255,255,.08); padding-top:18px; color:#64748b; font-size:11px; line-height:1.65; margin-bottom:18px; }
+    @media (max-width:600px) { nav{padding:16px 20px}.modal-card{padding:30px 20px 24px;border-radius:20px}.spectrum-note{display:none} }
   </style>
 </head>
 <body>
@@ -49,15 +64,17 @@
     <div class="modal-card">
       <button class="close-btn" onclick="closeModal()">&times;</button>
       <div id="quizView">
+        <div id="quizProgress" class="quiz-progress"></div>
         <div id="quizBadge" style="font-size:12px; color:#38bdf8; margin-bottom:8px;">开放性 (O)</div>
         <h3 id="quizTitle" style="font-size:18px; margin-bottom:16px;">加载中...</h3>
         <div id="quizOptions"></div>
       </div>
       <div id="resView" style="display:none;">
-        <h2 style="font-size:24px; color:#38bdf8; margin-bottom:12px;">测试完成 · 心智光谱</h2>
-        <p style="font-size:14px; color:#94a3b8; line-height:1.6; margin-bottom:20px;">
-          粒子图腾已根据你的心智选择聚合。这仅是当下的心理快照，每个人都在连续流动的成长之中。
-        </p>
+        <div class="result-kicker">Your current spectrum</div>
+        <h2 id="resultType" class="result-type"></h2>
+        <p id="resultSummary" class="result-summary"></p>
+        <div id="spectrumList" class="spectrum-list"></div>
+        <p class="result-note">结果基于大五人格的连续维度，仅反映你此刻的自我描述。它不是心理诊断，也不适合单独用于招聘、关系判断或给自己贴终身标签。</p>
         <button class="btn-main" onclick="openModal()" style="padding:10px 24px; font-size:14px;">重新测试</button>
       </div>
     </div>
@@ -97,31 +114,62 @@
     animate();
 
     const questions = [
-      { dim: "开放性 (O)", q: "面对颠覆常识的抽象观点或前沿艺术：", opts: ["极度兴奋，享受思维碰撞", "持好奇心愿意探究", "看实用价值而定", "更习惯经典传统"] },
-      { dim: "尽责性 (C)", q: "长期复杂工程中，你的行事风格：", opts: ["自律严谨步步推进", "把握大方向准时交付", "临近截稿脉冲爆发", "随性自由灵活应对"] },
-      { dim: "外向性 (E)", q: "高强度脑力消耗后，如何最快复原？", opts: ["与朋友聚会嗨聊", "与好友漫步闲谈", "独自听歌打游戏", "彻底断网绝缘独处"] }
+      { key:"O", dim:"开放性 (O)", q:"面对颠覆常识的抽象观点或前沿艺术：", opts:["极度兴奋，享受思维碰撞","持好奇心愿意探究","看实用价值而定","更习惯经典传统"] },
+      { key:"C", dim:"尽责性 (C)", q:"长期复杂工程中，你的行事风格：", opts:["自律严谨，步步推进","把握大方向，准时交付","临近截稿，脉冲爆发","随性自由，灵活应对"] },
+      { key:"E", dim:"外向性 (E)", q:"高强度脑力消耗后，如何最快复原？", opts:["与一群朋友聚会畅聊","和熟悉的人散步闲谈","独自听歌或安静放空","彻底断网，长时间独处"] },
+      { key:"A", dim:"宜人性 (A)", q:"团队出现明显分歧时，你通常会：", opts:["先理解各方，让关系重新连接","寻找大家都能接受的折中点","直接摆出证据，快速做决定","坚持最有效方案，不回避冲突"] },
+      { key:"N", dim:"情绪敏感度 (N)", q:"计划突然失控或收到负面反馈时：", opts:["情绪波动明显，会反复琢磨","会紧张一阵，但能逐步调整","短暂在意，很快回到行动","基本平静，把它当普通信息"] }
     ];
+    const dimensionMeta = {
+      O:{name:"开放性 O",low:"务实 · 熟悉",high:"好奇 · 求新"},
+      C:{name:"尽责性 C",low:"灵活 · 随性",high:"自律 · 有序"},
+      E:{name:"外向性 E",low:"内敛 · 独处",high:"活跃 · 外放"},
+      A:{name:"宜人性 A",low:"直接 · 竞争",high:"合作 · 体谅"},
+      N:{name:"情绪敏感度 N",low:"平稳 · 抗压",high:"敏锐 · 易波动"}
+    };
     let step = 0;
-    function openModal(){ document.getElementById('testModal').style.display='flex'; document.getElementById('quizView').style.display='block'; document.getElementById('resView').style.display='none'; step=0; loadQ(0); }
+    let scores = {};
+    function openModal(){ document.getElementById('testModal').style.display='flex'; document.getElementById('quizView').style.display='block'; document.getElementById('resView').style.display='none'; step=0; scores={}; loadQ(0); }
     function closeModal(){ document.getElementById('testModal').style.display='none'; }
     function loadQ(idx){
       step = idx;
       const q = questions[idx];
       document.getElementById('quizBadge').innerText = q.dim;
       document.getElementById('quizTitle').innerText = q.q;
+      document.getElementById('quizProgress').innerHTML = questions.map((_,i)=>`<span class="${i<=idx?'active':''}"></span>`).join('');
       const box = document.getElementById('quizOptions');
       box.innerHTML = '';
-      q.opts.forEach(opt => {
+      q.opts.forEach((opt,optIdx) => {
         const btn = document.createElement('div');
         btn.className = 'quiz-opt';
         btn.innerText = opt;
         btn.onclick = () => {
+          scores[q.key] = [88,68,48,28][optIdx];
           for(let i=0; i<COUNT; i++) target[i*3] = (Math.random()-0.5)*800;
           if(step+1 < questions.length) loadQ(step+1);
-          else { document.getElementById('quizView').style.display='none'; document.getElementById('resView').style.display='block'; }
+          else showResult();
         };
         box.appendChild(btn);
       });
+    }
+    function getArchetype(s){
+      if(s.O>=68 && s.C>=68) return ["远见建构者","你既愿意进入未知，也倾向把想法落成结构。好奇心负责打开可能，秩序感负责把可能变成现实。留意别让高标准压缩了探索中的偶然。"];
+      if(s.O>=68 && s.E>=68) return ["灵感点火者","新鲜观点和人与人的碰撞会为你充电。你擅长让可能性变得可见，也容易带动周围气氛；给灵感留一条稳定落地的路径，会让优势更持久。"];
+      if(s.C>=68 && s.N<50) return ["稳健推进者","你偏爱清晰、可靠和可兑现的节奏，面对变化也较容易保持稳定。你是让复杂事情持续向前的人，偶尔主动容纳模糊，会打开新的解法。"];
+      if(s.A>=68 && s.E>=68) return ["共鸣连接者","你会从互动中获得能量，也自然关注他人的感受与共同点。你擅长连接人和气氛；在需要时清楚表达边界，能让这种温暖更有力量。"];
+      if(s.E<50 && s.O>=68) return ["深潜观察者","你更习惯在安静中恢复，却对复杂思想和新可能保持开放。你会先深入内部世界，再输出独特判断；把洞见更早分享，可能带来意外的共创。"];
+      if(s.N>=68 && s.A>=68) return ["敏锐共感者","你对情绪和关系中的细微信号很敏感，也愿意照顾他人的体验。这让你拥有细腻的感受力；区分“我的感受”和“他人的感受”会帮助你减少消耗。"];
+      if(s.N<50 && s.A>=68) return ["温和定心者","你在压力下相对稳定，同时愿意理解和配合他人。你常是群体里的稳定支点；当和谐与真实冲突时，直接说出需求会更有建设性。"];
+      return ["流动调和者","你的特质没有被某个单一极端定义，而是在情境中灵活切换。你擅长因地制宜；持续观察自己在不同环境里的变化，比追求一个固定标签更有价值。"];
+    }
+    function showResult(){
+      const [type,summary] = getArchetype(scores);
+      document.getElementById('quizView').style.display='none';
+      document.getElementById('resView').style.display='block';
+      document.getElementById('resultType').innerText=type;
+      document.getElementById('resultSummary').innerText=summary;
+      document.getElementById('spectrumList').innerHTML=Object.entries(dimensionMeta).map(([key,m])=>`<div><div class="spectrum-head"><div class="spectrum-name">${m.name}<span class="spectrum-note">${m.low} ←→ ${m.high}</span></div><div class="spectrum-score">${scores[key]} / 100</div></div><div class="spectrum-track"><div class="spectrum-fill" data-score="${scores[key]}"></div></div></div>`).join('');
+      requestAnimationFrame(()=>document.querySelectorAll('.spectrum-fill').forEach(el=>el.style.width=el.dataset.score+'%'));
     }
   </script>
 </body>
